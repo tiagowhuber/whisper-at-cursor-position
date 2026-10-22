@@ -2,7 +2,7 @@
 """
 Whisper Voice Input — Windows tray app
 - Transcribes locally with whisper-server.exe (whisper.cpp, Vulkan) or in the cloud via Groq
-- F2 toggles recording, Esc cancels while recording
+- F2 toggles recording, Esc cancels while recording (RegisterHotKey, no keyboard hook)
 - Transcribes and types the result at the current cursor position
 - Floating overlay pill shows recording / transcribing state
 - Tray icon (notification area) with Quit
@@ -26,12 +26,12 @@ try:
 except (AttributeError, OSError):
     pass
 
-import keyboard
 import numpy as np
 import pystray
 import sounddevice as sd
 from PIL import Image, ImageDraw
 
+from hotkeys import Hotkeys
 from overlay import Overlay
 from server import WhisperServer
 from typer import type_text
@@ -156,9 +156,9 @@ class App:
         self.state = "loading"
         self.stream = None
         self.frames = []
-        self.esc_hotkey = None
         self.last_toggle = 0.0
         self._limit_job = None
+        self.hotkeys = Hotkeys(HOTKEY, self.events)
 
         self.icons = {k: make_icon(c) for k, c in ICON_COLORS.items()}
         self.tray = pystray.Icon(
@@ -176,9 +176,14 @@ class App:
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
     def run(self) -> None:
+        try:
+            self.hotkeys.start()
+        except RuntimeError as exc:
+            log.error("%s", exc)
+            message_box(str(exc))
+            sys.exit(1)
         threading.Thread(target=self.tray.run, daemon=True).start()
         threading.Thread(target=self._start_server, daemon=True).start()
-        keyboard.add_hotkey(HOTKEY, lambda: self.events.put(("toggle",)), suppress=True)
         self.overlay.show("loading")
         self.root.after(30, self._pump)
         self.root.mainloop()
@@ -200,7 +205,7 @@ class App:
     def _quit(self) -> None:
         log.info("Quitting.")
         self._close_stream()
-        keyboard.unhook_all()
+        self.hotkeys.stop()
         self.backend.stop()
         self.tray.stop()
         self.root.destroy()
@@ -294,7 +299,7 @@ class App:
             self.stream = None
             self.overlay.show("error", f"Microphone error: {exc}", hide_after_ms=4000)
             return
-        self.esc_hotkey = keyboard.add_hotkey("esc", lambda: self.events.put(("cancel",)), suppress=True)
+        self.hotkeys.set_cancel_key(True)
         if self.backend.max_seconds:
             # Cloud uploads are capped; stop by ourselves at the limit so nothing is lost
             self._limit_job = self.root.after(int(self.backend.max_seconds * 1000), self._on_limit)
@@ -306,9 +311,7 @@ class App:
         if self._limit_job is not None:
             self.root.after_cancel(self._limit_job)
             self._limit_job = None
-        if self.esc_hotkey is not None:
-            keyboard.remove_hotkey(self.esc_hotkey)
-            self.esc_hotkey = None
+        self.hotkeys.set_cancel_key(False)
         if self.stream is not None:
             self.stream.stop()
             self.stream.close()

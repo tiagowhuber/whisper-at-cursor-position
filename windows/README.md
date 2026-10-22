@@ -10,6 +10,7 @@ Runs Whisper on your GPU through [whisper.cpp](https://github.com/ggml-org/whisp
 - `groq_backend.py` — the cloud alternative: uploads the recording to Groq's Whisper API and returns the text. Used when `GROQ_API_KEY` is set.
 - `overlay.py` — the floating pill at the bottom of the screen: **● Recording 0:04**, **Transcribing…**. It's click-through and never takes focus.
 - `typer.py` — types Unicode text directly (accents, ¿, ñ, emoji) regardless of keyboard layout.
+- `hotkeys.py` — the F2 / Esc hotkeys through Windows' `RegisterHotKey`. No keyboard hook, so nothing for Windows to drop after a sleep/resume cycle.
 
 ## Requirements
 
@@ -77,7 +78,7 @@ Set these as user environment variables (System → Advanced → Environment Var
 | `WHISPER_BACKEND` | `auto` | `auto` = Groq if `GROQ_API_KEY` is set, else local. `local` / `groq` force one |
 | `WHISPER_MODEL` | `large-v3` | Local only. Must match a `models\ggml-<name>.bin` file |
 | `WHISPER_LANG` | `auto` | `auto`, or force one: `es`, `en`, … (Groq needs the 2-letter ISO-639-1 code) |
-| `WHISPER_HOTKEY` | `f2` | Any [keyboard](https://github.com/boppreh/keyboard#api) hotkey, e.g. `ctrl+shift+space` |
+| `WHISPER_HOTKEY` | `f2` | Optional `ctrl` / `shift` / `alt` / `win` modifiers plus one key: `f1`–`f24`, a letter or digit, `space`, `insert`, … e.g. `ctrl+shift+space` |
 | `WHISPER_PORT` | `8178` | Local only. Port for whisper-server |
 | `GROQ_API_KEY` | – | Groq only. Set by `install.ps1 -Groq` |
 | `GROQ_WHISPER_MODEL` | `whisper-large-v3-turbo` | Groq only. Or `whisper-large-v3` (more accurate, slower) |
@@ -86,4 +87,5 @@ Set these as user environment variables (System → Advanced → Environment Var
 
 - While an app running **as administrator** is focused, Windows blocks both the hotkey and the typing from a non-admin process.
 - The hotkey is swallowed, so F2 no longer reaches other apps (e.g. rename in Explorer, edit cell in Excel). Pick another key with `WHISPER_HOTKEY` if you need F2.
+- If another program already owns the hotkey, the app says so at start and exits. Pick another key with `WHISPER_HOTKEY`.
 - A few programs (some games, remote desktop clients) ignore synthesized Unicode input.
